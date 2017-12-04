@@ -1,0 +1,7 @@
+---
+  vm_data:
+  - { hostname: "docker01", description: "Ubuntu server for use as docker host" }
+  - { hostname: "docker02", description: "Ubuntu server for use as docker host" }
+  - { hostname: "docker03", description: "Ubuntu server for use as docker host" }
+...
+

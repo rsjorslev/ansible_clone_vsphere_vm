@@ -1,0 +1,8 @@
+---
+vminfo:
+{% for item in vminfo %}
+  - vm: {{ item.name }}
+    ip: {{ item.ip }}
+    uuid: {{ item.uuid }}
+{% endfor %}
+...

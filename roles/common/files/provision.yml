@@ -1,0 +1,78 @@
+---
+- name: Register IP for use with VM creation from phpIPAM
+  uri:
+    url: "{{ phpipam_url }}/addresses/first_free/7/"
+    method: POST
+    headers:
+      token: "{{ ipam_login.json.data.token }}"
+    body_format: json
+    body: ' { "description": "{{ item.description }}","hostname": "{{ item.hostname }}" }'
+    status_code: 201
+  register: free_ip
+
+- name: Clone template and customize
+  vmware_guest:
+    hostname: "{{ vc_server }}"
+    username: "{{ vc_user }}"
+    password: "{{ vc_pass }}"
+    validate_certs: no
+    datacenter: "{{ datacenter }}"
+#    cluster: "{{ cluster }}" ### picking a cluster in ansible 2.3.x does not seem to work anymore hence ths change to esxi_hostname below
+    esxi_hostname: "{{ esxi_host }}"
+    folder: /vm/Testing
+    name: "{{ item.hostname }}"
+    state: poweredon
+    template: "{{ template }}"
+    hardware:
+      memory_mb: 4096
+      num_cpus: 2
+    networks:
+    - name: "{{ portgroup }}"
+      ip: "{{ free_ip.json.data | ipv4 }}"
+      netmask: 255.255.255.0
+      gateway: "{{ subnet_info.json.data.gateway.ip_addr | ipv4 }}"
+    customization:
+      autologon: False
+      dns_servers:
+      - "{{ subnet_info.json.data.nameservers.namesrv1 | ipv4 }}"
+    wait_for_ip_address: true
+  delegate_to: localhost
+  register: vm_creation
+  ignore_errors: true
+
+- name: Udpdate registered IP from phpIPAM with MAC address from VM creation
+  uri:
+    url: "{{ phpipam_url }}/addresses/{{ free_ip.json.id }}/"
+    method: PATCH
+    headers:
+      token: "{{ ipam_login.json.data.token }}"
+    body_format: json
+    body: ' { "mac": "{{ vm_creation.instance.hw_eth0.macaddress }}" }'
+  when: vm_creation | succeeded
+
+- name: Register the assigned IP address for later use
+  set_fact:
+    new_vms: "{{ new_vms }} + [ '{{ free_ip.json.data | ipv4 }}' ]"
+
+- name: Register VM information which will later be written to disk as YAML
+  set_fact:
+    vminfo: "{{ vminfo }} + [ {'name': '{{ item.hostname }}', 'ip': '{{ free_ip.json.data | ipv4 }}', 'uuid': '{{ vm_creation.instance.hw_product_uuid }}'} ]"
+
+- name: DEBUG | stdout vminfo list
+  debug:
+    msg: "{{ vminfo }}"
+
+- name: Register DNS records for the created VM
+  become: false
+  win_shell: Add-DnsServerResourceRecord -ZoneName tstdmn.dk -A -Name {{ item.hostname }} -CreatePtr -IPv4Address {{ free_ip.json.data | ipv4 }} -AgeRecord -AllowUpdateAny
+  delegate_to: "{{ dns_server }}"
+
+- name: Delete registered IP from phpIPAM if VM creation fails
+  uri:
+    url: "{{ phpipam_url }}/addresses/{{ free_ip.json.id }}/"
+    method: DELETE
+    headers:
+      token: "{{ ipam_login.json.data.token }}"
+    status_code: 200
+  when: vm_creation | failed
+...

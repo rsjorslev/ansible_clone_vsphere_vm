@@ -1,0 +1,36 @@
+---
+- name: Login to phpIPAM
+  uri:
+    url: "{{ phpipam_url }}/user/"
+    method: POST
+    body_format: json
+    force_basic_auth: yes
+    user: "{{ user }}"
+    password: "{{ password }}"
+  register: ipam_login
+
+- name: Get subnet information (DNS, gateway, netmask etc.)
+  uri:
+    url: "{{ phpipam_url }}/subnets/7/"
+    method: GET
+    headers:
+      token: "{{ ipam_login.json.data.token }}"
+    status_code: 200
+  register: subnet_info
+
+- include: roles/common/files/provision.yml
+  with_items: "{{ vm_data }}"
+
+- name: Add newly created VMs to host group
+  add_host:
+    name: "{{ item }}"
+    ansible_user: runner
+    groups: vms
+  with_items: "{{ new_vms }}"
+
+- name: Write out template with vminfo - later used for teardown
+  template:
+    src: vminfo.yml.j2
+    dest: /home/rs/development/hive/clone_info/{{ 99999 | random | to_uuid }}.yml
+
+...

@@ -1,0 +1,48 @@
+---
+- name: Delete VM by UUID
+  vmware_guest:
+    hostname: "{{ vc_server }}"
+    username: "{{ vc_user }}"
+    password: "{{ vc_pass }}"
+    validate_certs: false
+    force: true
+    name: # blank on purpose - field is required but not used as uuid takes presedence
+    uuid: "{{ item.uuid }}"
+    state: absent
+  delegate_to: localhost
+  with_items: "{{ vminfo }}"
+
+- name: Login to phpIPAM
+  uri:
+    url: "{{ phpipam_url }}/user/"
+    method: POST
+    body_format: json
+    force_basic_auth: yes
+    user: "{{ user }}"
+    password: "{{ password }}"
+  register: ipam_login
+
+- name: Delete registered IP from phpIPAM used by the deleted VM
+  uri:
+    url: "{{ phpipam_url }}/addresses/{{ item.ip }}/7/"
+    method: DELETE
+    headers:
+      token: "{{ ipam_login.json.data.token }}"
+    status_code: 200
+  with_items: "{{ vminfo }}"
+
+- name: Delete DNS A records for the deleted VM
+  become: false
+  win_shell: Remove-DnsServerResourceRecord -ZoneName tstdmn.dk -RRType A -Name {{ item.vm }} -Force
+  delegate_to: "{{ dns_server }}"
+  with_items: "{{ vminfo }}"
+  ignore_errors: true
+
+- name: Delete DNS PTR records for the deleted VM
+  become: false
+  win_shell: Remove-DnsServerResourceRecord -ZoneName 111.168.192.in-addr.arpa -RRType Ptr -Name {{ item.ip.split('.')[3] }} -Force
+  delegate_to: "{{ dns_server }}"
+  with_items: "{{ vminfo }}"
+  ignore_errors: true
+
+...

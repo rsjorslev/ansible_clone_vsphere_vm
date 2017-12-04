@@ -1,0 +1,26 @@
+---
+- name: Clone VM from template - no configuration
+  hosts: localhost
+  gather_facts: true
+  connection: local
+  vars_files:
+    - vm_data.yml
+  roles:
+    - { role: common, when: not teardown }
+    - { role: teardown, when: teardown }
+
+- name: Prepare newly cloned VMs - configuration
+  hosts: vms
+  pre_tasks:
+
+    - name: Set authorized key
+      authorized_key:
+        user: runner
+        state: present
+        key: "{{ lookup('file', '/home/rs/.ssh/id_rsa.pub') }}"
+
+  roles:
+    - { role: vaulttec.zsh, zsh_ohmy_theme: "agnoster" }
+    - { role: docker-ce, become: true }
+
+...

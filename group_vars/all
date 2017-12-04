@@ -1,0 +1,37 @@
+---
+####################################################
+# Common
+####################################################
+
+# Do not change this to true here - provide as --extra-vars instead when performing teardown
+teardown: false
+# Empty array used to 'add_host'
+new_vms: []
+# Empty array used to gather VM information like UUID, IP etc.
+vminfo: []
+
+####################################################
+# Template and clone specifics
+####################################################
+
+vc_server: vcsa01.tstdmn.dk
+vc_user: administrator@vsphere.local
+vc_pass: password
+esxi_host: esx01.domain.com
+dns_server: 192.168.111.13
+datacenter: Datacenter
+cluster: Compute
+template: ubu1604tmpl-1509876473
+portgroup: 111-Infrastructure01
+netmask: 255.255.255.0
+gateway: 192.168.111.1
+
+####################################################
+# phpIPAM specifics
+####################################################
+
+phpipam_url: http://ipam01.tstdmn.dk/api/ipam
+user: api
+password: password
+
+...
